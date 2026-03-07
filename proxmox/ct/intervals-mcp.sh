@@ -24,7 +24,7 @@ INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/CorentinBarban/intervals-m
 APP="Intervals-MCP"
 CTID=$(pvesh get /cluster/nextid)
 HOSTNAME="intervals-mcp"
-TEMPLATE="local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+TEMPLATE=""   # résolu dynamiquement dans check_prerequisites
 STORAGE="local-lvm"
 DISK_SIZE=4
 MEMORY=512
@@ -38,15 +38,30 @@ MCP_PORT=8765
 # -----------------------------------------------------------------------------
 check_prerequisites() {
   [[ $EUID -eq 0 ]] || { msg_error "Ce script doit être exécuté en tant que root."; exit 1; }
-  command -v pct  &>/dev/null || { msg_error "pct introuvable — exécuter sur un nœud Proxmox VE."; exit 1; }
+  command -v pct   &>/dev/null || { msg_error "pct introuvable — exécuter sur un nœud Proxmox VE."; exit 1; }
   command -v pvesh &>/dev/null || { msg_error "pvesh introuvable."; exit 1; }
 
-  if ! pvesm list local 2>/dev/null | grep -q "debian-12-standard"; then
-    msg_info "Template Debian 12 absent — téléchargement..."
+  # Cherche un template Debian 12 déjà téléchargé
+  local downloaded
+  downloaded=$(pvesm list local --content vztmpl 2>/dev/null \
+    | awk '{print $1}' | grep "debian-12-standard" | sort -V | tail -1)
+
+  if [[ -n "$downloaded" ]]; then
+    TEMPLATE="$downloaded"
+  else
+    # Télécharge la version la plus récente disponible
+    msg_info "Mise à jour du catalogue de templates..."
     pveam update &>/dev/null
-    pveam download local debian-12-standard_12.7-1_amd64.tar.zst
+    local tpl_name
+    tpl_name=$(pveam available --section system 2>/dev/null \
+      | awk '{print $2}' | grep "debian-12-standard" | sort -V | tail -1)
+    [[ -n "$tpl_name" ]] || { msg_error "Aucun template Debian 12 trouvé dans pveam."; exit 1; }
+    msg_info "Téléchargement du template $tpl_name"
+    pveam download local "$tpl_name"
     msg_ok "Template téléchargé"
+    TEMPLATE="local:vztmpl/${tpl_name}"
   fi
+  msg_ok "Template : ${TEMPLATE##*/}"
 }
 
 # -----------------------------------------------------------------------------

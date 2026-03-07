@@ -197,11 +197,7 @@ Running the server inside a **Proxmox LXC container** is the recommended approac
 ### Prerequisites
 
 - A Proxmox VE 7+ node with root access
-- A Debian 12 LXC template downloaded on the node:
-
-```bash
-pveam download local debian-12-standard_12.7-1_amd64.tar.zst
-```
+- Internet access from the node (to download the Debian 12 template and the app)
 
 ### 1. Run the installer
 
@@ -240,13 +236,12 @@ Use this URL in **ChatGPT → Settings → Features → Custom MCP Connectors**,
 
 ### 3. Update the server
 
-To pull the latest version into an existing container, run the same command again **from the Proxmox node**:
+To pull the latest version into the existing container, run from the Proxmox node:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/CorentinBarban/intervals-mcp-server/main/proxmox/ct/intervals-mcp.sh)
+# Replace 200 with your container ID
+pct exec 200 -- bash -c "cd /opt/intervals-mcp-server && git pull --ff-only && uv sync --no-dev -q && systemctl restart intervals-mcp"
 ```
-
-The `update_script()` function detects an existing installation, runs `git pull`, upgrades the package, and restarts the service automatically.
 
 ### Credentials and configuration
 
