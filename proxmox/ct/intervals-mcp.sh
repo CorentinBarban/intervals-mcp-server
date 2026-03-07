@@ -155,8 +155,8 @@ run_install_script() {
   pct exec "$CTID" -- bash -c "
     git clone -q --depth 1 ${REPO_URL} /opt/intervals-mcp-server
     cd /opt/intervals-mcp-server
-    uv venv --python python3 -q
-    uv sync --no-dev -q
+    /root/.local/bin/uv venv --python python3 -q
+    /root/.local/bin/uv sync --no-dev -q
   "
   msg_ok "${APP} installé"
 
