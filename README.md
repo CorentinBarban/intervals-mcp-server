@@ -205,10 +205,10 @@ pveam download local debian-12-standard_12.7-1_amd64.tar.zst
 
 ### 1. Run the installer
 
-Execute the following command **on the Proxmox node** from the root of this repository:
+Execute the following command **on the Proxmox node**:
 
 ```bash
-bash proxmox/ct/intervals-mcp.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/CorentinBarban/intervals-mcp-server/main/proxmox/ct/intervals-mcp.sh)
 ```
 
 The script will:
@@ -240,10 +240,10 @@ Use this URL in **ChatGPT → Settings → Features → Custom MCP Connectors**,
 
 ### 3. Update the server
 
-To pull the latest version of the MCP server into an existing container, run the following **from inside the container** (or via `pct exec <CTID> --`):
+To pull the latest version into an existing container, run the same command again **from the Proxmox node**:
 
 ```bash
-bash proxmox/ct/intervals-mcp.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/CorentinBarban/intervals-mcp-server/main/proxmox/ct/intervals-mcp.sh)
 ```
 
 The `update_script()` function detects an existing installation, runs `git pull`, upgrades the package, and restarts the service automatically.
