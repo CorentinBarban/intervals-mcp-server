@@ -1,57 +1,56 @@
 #!/usr/bin/env bash
+# =============================================================================
+# Intervals.icu MCP Server — Install script (runs inside the LXC container)
+# Appelé par proxmox/ct/intervals-mcp.sh via pct exec
+# =============================================================================
+set -euo pipefail
 
-# Copyright (c) 2021-2026 tteck
-# Author: community adaptation
-# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
-# Source: https://github.com/mvilanova/intervals-mcp-server
+YW="\033[33m"; GN="\033[1;92m"; CL="\033[m"; BFR="\r\033[K"
+msg_info() { echo -e "  ⚙ ${YW}${1}${CL}"; }
+msg_ok()   { echo -e "${BFR}  ✔ ${GN}${1}${CL}"; }
 
-source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
-color
-verb_ip6
-catch_errors
-setting_up_container
-network_check
-update_os
+# -----------------------------------------------------------------------------
+msg_info "Mise à jour du système"
+apt-get update -qq
+apt-get upgrade -y -qq
+apt-get install -y --no-install-recommends \
+  python3 python3-pip python3-venv \
+  git curl ca-certificates build-essential
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+msg_ok "Système mis à jour"
 
-msg_info "Installing Python 3 & build tools"
-$STD apt-get install -y python3 python3-pip python3-venv git build-essential curl
-msg_ok "Installed Python 3 & build tools"
-
-msg_info "Installing uv"
-$STD curl -LsSf https://astral.sh/uv/install.sh | sh
+# -----------------------------------------------------------------------------
+msg_info "Installation de uv"
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ln -sf /root/.local/bin/uv /usr/local/bin/uv
-msg_ok "Installed uv"
+msg_ok "uv installé"
 
-msg_info "Installing ${APP}"
-git clone -q --depth 1 https://github.com/mvilanova/intervals-mcp-server.git /opt/intervals-mcp-server
+# -----------------------------------------------------------------------------
+msg_info "Clonage du dépôt"
+git clone -q --depth 1 https://github.com/CorentinBarban/intervals-mcp-server.git /opt/intervals-mcp-server
 cd /opt/intervals-mcp-server
-$STD uv venv --python python3
-$STD uv sync --no-dev
-msg_ok "Installed ${APP}"
+uv venv --python python3 -q
+uv sync --no-dev -q
+msg_ok "Application installée"
 
-msg_info "Configuring environment"
-cat <<EOF >/opt/intervals-mcp-server/.env
+# -----------------------------------------------------------------------------
+msg_info "Création du fichier d'environnement"
+cat <<'EOF' > /opt/intervals-mcp-server/.env
 # Intervals.icu API Configuration
-# Edit this file and set your credentials, then restart the service:
-#   systemctl restart intervals-mcp
-
-# Required: Your Intervals.icu API Key (Settings > API)
-API_KEY=your_intervals_api_key_here
-
-# Required: Your Intervals.icu Athlete ID (visible in the URL, e.g. i12345)
-ATHLETE_ID=your_athlete_id_here
-
-# Optional: API base URL (default shown below)
+API_KEY=PLACEHOLDER_API_KEY
+ATHLETE_ID=PLACEHOLDER_ATHLETE_ID
 # INTERVALS_API_BASE_URL=https://intervals.icu/api/v1
 EOF
 chmod 600 /opt/intervals-mcp-server/.env
-msg_ok "Configured environment"
+msg_ok "Fichier .env créé"
 
-msg_info "Creating Service"
-cat <<EOF >/etc/systemd/system/intervals-mcp.service
+# -----------------------------------------------------------------------------
+msg_info "Création du service systemd"
+cat <<EOF > /etc/systemd/system/intervals-mcp.service
 [Unit]
 Description=Intervals.icu MCP Server (SSE)
-Documentation=https://github.com/mvilanova/intervals-mcp-server
+Documentation=https://github.com/CorentinBarban/intervals-mcp-server
 After=network-online.target
 Wants=network-online.target
 
@@ -72,9 +71,6 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl enable -q --now intervals-mcp
-msg_ok "Created Service"
-
-motd_ssh
-customize
-cleanup_lxc
+systemctl daemon-reload
+systemctl enable -q intervals-mcp
+msg_ok "Service systemd créé"
