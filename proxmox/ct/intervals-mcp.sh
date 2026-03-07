@@ -41,27 +41,25 @@ check_prerequisites() {
   command -v pct   &>/dev/null || { msg_error "pct introuvable — exécuter sur un nœud Proxmox VE."; exit 1; }
   command -v pvesh &>/dev/null || { msg_error "pvesh introuvable."; exit 1; }
 
-  # Cherche un template Debian 12 déjà téléchargé
-  local downloaded
-  downloaded=$(pvesm list local --content vztmpl 2>/dev/null \
-    | awk '{print $1}' | grep "debian-12-standard" | sort -V | tail -1)
+  local tpl_cache="/var/lib/vz/template/cache"
 
-  if [[ -n "$downloaded" ]]; then
-    TEMPLATE="$downloaded"
-  else
-    # Télécharge la version la plus récente disponible
-    msg_info "Mise à jour du catalogue de templates..."
-    pveam update &>/dev/null
-    local tpl_name
-    tpl_name=$(pveam available --section system 2>/dev/null \
-      | awk '{print $2}' | grep "debian-12-standard" | sort -V | tail -1)
-    [[ -n "$tpl_name" ]] || { msg_error "Aucun template Debian 12 trouvé dans pveam."; exit 1; }
+  # Détermine le nom exact depuis pveam (source de vérité)
+  msg_info "Vérification du catalogue de templates..."
+  pveam update &>/dev/null
+  local tpl_name
+  tpl_name=$(pveam available --section system 2>/dev/null \
+    | awk '{print $2}' | grep "debian-12-standard" | sort -V | tail -1)
+  [[ -n "$tpl_name" ]] || { msg_error "Aucun template Debian 12 trouvé dans pveam."; exit 1; }
+
+  # Vérifie que le fichier existe physiquement sur disque
+  if [[ ! -f "${tpl_cache}/${tpl_name}" ]]; then
     msg_info "Téléchargement du template $tpl_name"
     pveam download local "$tpl_name"
     msg_ok "Template téléchargé"
-    TEMPLATE="local:vztmpl/${tpl_name}"
   fi
-  msg_ok "Template : ${TEMPLATE##*/}"
+
+  TEMPLATE="local:vztmpl/${tpl_name}"
+  msg_ok "Template : ${tpl_name}"
 }
 
 # -----------------------------------------------------------------------------
