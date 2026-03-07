@@ -16,7 +16,7 @@ msg_info()  { echo -e " ${GEAR} ${YW}${1}${CL}"; }
 msg_ok()    { echo -e "${BFR} ${OK} ${GN}${1}${CL}"; }
 msg_error() { echo -e " ${ERR} ${RD}${1}${CL}" >&2; }
 
-INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/CorentinBarban/intervals-mcp-server/main/proxmox/install/intervals-mcp-install.sh"
+REPO_URL="https://github.com/CorentinBarban/intervals-mcp-server.git"
 
 # -----------------------------------------------------------------------------
 # Valeurs par défaut
@@ -129,18 +129,77 @@ create_container() {
 }
 
 # -----------------------------------------------------------------------------
-# Installation de l'application
+# Installation de l'application (commandes exécutées directement via pct exec)
 # -----------------------------------------------------------------------------
 run_install_script() {
-  msg_info "Installation de ${APP} dans le container"
-  # Télécharge le script sur l'hôte (curl disponible ici), puis le pousse dans le container
-  local tmp_script
-  tmp_script=$(mktemp /tmp/intervals-mcp-install-XXXXXX.sh)
-  curl -fsSL "$INSTALL_SCRIPT_URL" -o "$tmp_script"
-  pct push "$CTID" "$tmp_script" /tmp/intervals-mcp-install.sh
-  rm -f "$tmp_script"
-  pct exec "$CTID" -- bash /tmp/intervals-mcp-install.sh
-  msg_ok "Application installée"
+  msg_info "Mise à jour du système"
+  pct exec "$CTID" -- bash -c "
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get upgrade -y -qq
+    apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-venv git curl ca-certificates build-essential
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+  "
+  msg_ok "Système mis à jour"
+
+  msg_info "Installation de uv"
+  pct exec "$CTID" -- bash -c "
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ln -sf /root/.local/bin/uv /usr/local/bin/uv
+  "
+  msg_ok "uv installé"
+
+  msg_info "Clonage et installation de ${APP}"
+  pct exec "$CTID" -- bash -c "
+    git clone -q --depth 1 ${REPO_URL} /opt/intervals-mcp-server
+    cd /opt/intervals-mcp-server
+    uv venv --python python3 -q
+    uv sync --no-dev -q
+  "
+  msg_ok "${APP} installé"
+
+  msg_info "Création du fichier d'environnement"
+  pct exec "$CTID" -- bash -c "
+    cat > /opt/intervals-mcp-server/.env << 'ENVEOF'
+API_KEY=PLACEHOLDER_API_KEY
+ATHLETE_ID=PLACEHOLDER_ATHLETE_ID
+ENVEOF
+    chmod 600 /opt/intervals-mcp-server/.env
+  "
+  msg_ok "Fichier .env créé"
+
+  msg_info "Création du service systemd"
+  pct exec "$CTID" -- bash -c "
+    cat > /etc/systemd/system/intervals-mcp.service << 'SVCEOF'
+[Unit]
+Description=Intervals.icu MCP Server (SSE)
+Documentation=https://github.com/CorentinBarban/intervals-mcp-server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/intervals-mcp-server
+EnvironmentFile=/opt/intervals-mcp-server/.env
+Environment=MCP_TRANSPORT=sse
+Environment=FASTMCP_HOST=0.0.0.0
+Environment=FASTMCP_PORT=8765
+Environment=FASTMCP_LOG_LEVEL=INFO
+ExecStart=/opt/intervals-mcp-server/.venv/bin/python src/intervals_mcp_server/server.py
+StandardOutput=file:/var/log/intervals-mcp.out
+StandardError=file:/var/log/intervals-mcp.err
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+    systemctl daemon-reload
+    systemctl enable -q intervals-mcp
+  "
+  msg_ok "Service systemd créé"
 }
 
 # -----------------------------------------------------------------------------
