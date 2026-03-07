@@ -16,23 +16,16 @@ apt-get update -qq
 apt-get upgrade -y -qq
 apt-get install -y --no-install-recommends \
   python3 python3-pip python3-venv \
-  git curl ca-certificates build-essential
+  git ca-certificates
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 msg_ok "Système mis à jour"
 
 # -----------------------------------------------------------------------------
-msg_info "Installation de uv"
-curl -LsSf https://astral.sh/uv/install.sh | sh
-ln -sf /root/.local/bin/uv /usr/local/bin/uv
-msg_ok "uv installé"
-
-# -----------------------------------------------------------------------------
 msg_info "Clonage du dépôt"
 git clone -q --depth 1 https://github.com/CorentinBarban/intervals-mcp-server.git /opt/intervals-mcp-server
-cd /opt/intervals-mcp-server
-uv venv --python python3 -q
-uv sync --no-dev -q
+python3 -m venv /opt/intervals-mcp-server/.venv
+/opt/intervals-mcp-server/.venv/bin/pip install --quiet /opt/intervals-mcp-server
 msg_ok "Application installée"
 
 # -----------------------------------------------------------------------------

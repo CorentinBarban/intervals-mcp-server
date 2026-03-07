@@ -139,25 +139,17 @@ run_install_script() {
     apt-get update -qq
     apt-get upgrade -y -qq
     apt-get install -y --no-install-recommends \
-      python3 python3-pip python3-venv git curl ca-certificates build-essential
+      python3 python3-pip python3-venv git ca-certificates
     apt-get clean
     rm -rf /var/lib/apt/lists/*
   "
   msg_ok "Système mis à jour"
 
-  msg_info "Installation de uv"
-  pct exec "$CTID" -- bash -c "
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ln -sf /root/.local/bin/uv /usr/local/bin/uv
-  "
-  msg_ok "uv installé"
-
   msg_info "Clonage et installation de ${APP}"
   pct exec "$CTID" -- bash -c "
     git clone -q --depth 1 ${REPO_URL} /opt/intervals-mcp-server
-    cd /opt/intervals-mcp-server
-    /root/.local/bin/uv venv --python python3 -q
-    /root/.local/bin/uv sync --no-dev -q
+    python3 -m venv /opt/intervals-mcp-server/.venv
+    /opt/intervals-mcp-server/.venv/bin/pip install --quiet /opt/intervals-mcp-server
   "
   msg_ok "${APP} installé"
 

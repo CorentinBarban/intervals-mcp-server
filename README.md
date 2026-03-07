@@ -240,7 +240,7 @@ To pull the latest version into the existing container, run from the Proxmox nod
 
 ```bash
 # Replace 200 with your container ID
-pct exec 200 -- bash -c "cd /opt/intervals-mcp-server && git pull --ff-only && /root/.local/bin/uv sync --no-dev -q && systemctl restart intervals-mcp"
+pct exec 200 -- bash -c "cd /opt/intervals-mcp-server && git pull --ff-only && .venv/bin/pip install --quiet . && systemctl restart intervals-mcp"
 ```
 
 ### Credentials and configuration
