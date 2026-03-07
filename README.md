@@ -190,6 +190,80 @@ ChatGPT’s beta MCP connectors can also talk to this server over the SSE transp
 
 3. Save the connector and open a new chat. ChatGPT will keep the SSE connection open and POST follow-up requests to the `/messages/` endpoint announced by the server. If you restart the MCP server or tunnel, rerun the SSE command and update the connector URL if it changes.
 
+## Deployment on Proxmox VE (self-hosted SSE server)
+
+Running the server inside a **Proxmox LXC container** is the recommended approach when you want a always-on SSE endpoint reachable by ChatGPT or any other MCP client without keeping a local machine running.
+
+### Prerequisites
+
+- A Proxmox VE 7+ node with root access
+- A Debian 12 LXC template downloaded on the node:
+
+```bash
+pveam download local debian-12-standard_12.7-1_amd64.tar.zst
+```
+
+### 1. Run the installer
+
+Execute the following command **on the Proxmox node** from the root of this repository:
+
+```bash
+bash proxmox/ct/intervals-mcp.sh
+```
+
+The script will:
+1. Prompt you for your Intervals.icu **API Key** and **Athlete ID**
+2. Let you configure the container specs (CPU, RAM, disk, network) or accept the defaults
+3. Create an unprivileged Debian 12 LXC container
+4. Install Python, `uv`, and the MCP server inside the container
+5. Configure and start a `systemd` service exposing the SSE endpoint on port **8765**
+
+Default container specs:
+
+| Resource | Default |
+|---|---|
+| CPU | 1 vCPU |
+| RAM | 512 MB |
+| Disk | 4 GB |
+| OS | Debian 12 |
+| Port | 8765 |
+
+### 2. Connect ChatGPT (or any SSE client)
+
+Once deployed, the SSE endpoint is available at:
+
+```
+http://<container-ip>:8765/sse
+```
+
+Use this URL in **ChatGPT → Settings → Features → Custom MCP Connectors**, or as the `MCP_SERVER_URL` in any SSE-capable MCP client.
+
+### 3. Update the server
+
+To pull the latest version of the MCP server into an existing container, run the following **from inside the container** (or via `pct exec <CTID> --`):
+
+```bash
+bash proxmox/ct/intervals-mcp.sh
+```
+
+The `update_script()` function detects an existing installation, runs `git pull`, upgrades the package, and restarts the service automatically.
+
+### Credentials and configuration
+
+Credentials are set during installation. To update them afterwards:
+
+```bash
+# From the Proxmox node — replace 200 with your actual container ID
+pct exec 200 -- nano /opt/intervals-mcp-server/.env
+pct exec 200 -- systemctl restart intervals-mcp
+```
+
+To view live logs:
+
+```bash
+pct exec 200 -- journalctl -u intervals-mcp -f
+```
+
 ## Development and testing
 
 Install development dependencies and run the test suite with:
