@@ -112,6 +112,7 @@ create_container() {
     --swap        "$SWAP"        \
     --cores       "$CORES"       \
     --net0        "name=eth0,bridge=${BRIDGE},ip=dhcp" \
+    --nameserver  "8.8.8.8 8.8.4.4" \
     --unprivileged 1             \
     --features    nesting=1      \
     --onboot      1              \
@@ -120,9 +121,9 @@ create_container() {
 
   msg_info "Démarrage du container"
   pct start "$CTID"
-  # Attente connectivité réseau
+  # Attente résolution DNS (pas uniquement connectivité IP)
   local retries=30
-  until pct exec "$CTID" -- bash -c "ping -c1 8.8.8.8 &>/dev/null" 2>/dev/null || (( retries-- == 0 )); do
+  until pct exec "$CTID" -- bash -c "curl -fsSo /dev/null https://deb.debian.org 2>/dev/null" || (( retries-- == 0 )); do
     sleep 2
   done
   msg_ok "Container démarré"
