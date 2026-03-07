@@ -4,6 +4,7 @@
 # Appelé par proxmox/ct/intervals-mcp.sh via pct exec
 # =============================================================================
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 YW="\033[33m"; GN="\033[1;92m"; CL="\033[m"; BFR="\r\033[K"
 msg_info() { echo -e "  ⚙ ${YW}${1}${CL}"; }

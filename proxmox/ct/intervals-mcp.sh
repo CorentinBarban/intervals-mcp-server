@@ -133,10 +133,13 @@ create_container() {
 # -----------------------------------------------------------------------------
 run_install_script() {
   msg_info "Installation de ${APP} dans le container"
-  pct exec "$CTID" -- bash -c "
-    export DEBIAN_FRONTEND=noninteractive
-    bash <(curl -fsSL '${INSTALL_SCRIPT_URL}')
-  "
+  # Télécharge le script sur l'hôte (curl disponible ici), puis le pousse dans le container
+  local tmp_script
+  tmp_script=$(mktemp /tmp/intervals-mcp-install-XXXXXX.sh)
+  curl -fsSL "$INSTALL_SCRIPT_URL" -o "$tmp_script"
+  pct push "$CTID" "$tmp_script" /tmp/intervals-mcp-install.sh
+  rm -f "$tmp_script"
+  pct exec "$CTID" -- bash /tmp/intervals-mcp-install.sh
   msg_ok "Application installée"
 }
 
