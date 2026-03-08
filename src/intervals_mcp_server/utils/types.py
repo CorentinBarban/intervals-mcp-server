@@ -599,5 +599,6 @@ class WorkoutDoc:  # pylint: disable=too-many-instance-attributes
             val += f"{self.description}\n"
         if self.steps is not None:
             for step in self.steps:
-                val += step.__str__() + "\n"
+                step_str = step.__str__()
+                val += step_str if step_str.endswith("\n") else step_str + "\n"
         return val
