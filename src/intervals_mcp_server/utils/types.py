@@ -191,6 +191,24 @@ class Value:
         }
         return units_map.get(self.units, "")
 
+    def _format_range(self) -> str:
+        """Format the numeric range part without units (e.g., '65%-50%' or '95%')."""
+        val = ""
+        if self.start is not None and self.end is not None:
+            val += f"{self._format_value(self.start)}-{self._format_value(self.end)}"
+        elif self.value is not None:
+            val += self._format_value(self.value)
+        return val
+
+    def _format_resolved(self) -> str:
+        """Format resolved value using raw unit code (e.g., '126-97w' for watts)."""
+        unit = self.units.value if self.units is not None else ""
+        if self.start is not None and self.end is not None:
+            return f"{float_to_str(self.start)}-{float_to_str(self.end)}{unit}"
+        if self.value is not None:
+            return f"{float_to_str(self.value)}{unit}"
+        return ""
+
     def __str__(self) -> str:
         val = ""
         if self.start is not None and self.end is not None:
@@ -409,14 +427,21 @@ class Step:  # pylint: disable=too-many-instance-attributes
                 val += f"intensity={self.intensity.value} "
 
             if self.power is not None:
-                val += f"{self.power} "
+                if self._power is not None:
+                    range_part = self.power._format_range()
+                    resolved_part = f"({self._power._format_resolved()})"
+                    units_part = self.power._format_units()
+                    parts = [p for p in [range_part, resolved_part, units_part] if p]
+                    val += " ".join(parts) + " "
+                else:
+                    val += f"{self.power} "
             if self.hr is not None:
                 val += f"{self.hr} "
             if self.pace is not None:
                 val += f"{self.pace} "
             if self.cadence is not None:
                 val += f"{self.cadence} "
-        if self.text is not None:
+        if self.text is not None and not self.ramp:
             val += f"{self.text} "
         if self.reps is not None and self.steps is not None:
             for step in self.steps:
