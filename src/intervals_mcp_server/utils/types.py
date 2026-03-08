@@ -446,7 +446,6 @@ class Step:  # pylint: disable=too-many-instance-attributes
         if self.reps is not None and self.steps is not None:
             for step in self.steps:
                 val += "\n" + step.__str__(nested=True)
-            val += "\n"
         elif not nested and (self.warmup or self.cooldown):
             val += "\n"
         return val
@@ -599,6 +598,5 @@ class WorkoutDoc:  # pylint: disable=too-many-instance-attributes
             val += f"{self.description}\n"
         if self.steps is not None:
             for step in self.steps:
-                step_str = step.__str__()
-                val += step_str if step_str.endswith("\n") else step_str + "\n"
+                val += step.__str__() + "\n"
         return val
