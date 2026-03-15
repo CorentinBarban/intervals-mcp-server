@@ -13,7 +13,11 @@ from intervals_mcp_server.config import get_config
 from intervals_mcp_server.utils.dates import get_default_end_date, get_default_future_end_date
 from intervals_mcp_server.utils.formatting import format_event_details, format_event_summary
 from intervals_mcp_server.utils.types import WorkoutDoc
-from intervals_mcp_server.utils.validation import resolve_athlete_id, validate_date
+from intervals_mcp_server.utils.validation import (
+    resolve_athlete_id,
+    validate_date,
+    validate_workout_doc_for_event,
+)
 
 # Import mcp instance from shared module for tool registration
 from intervals_mcp_server.mcp_instance import mcp  # noqa: F401
@@ -363,6 +367,7 @@ async def add_or_update_event(  # pylint: disable=too-many-arguments,too-many-po
         start_date = datetime.now().strftime("%Y-%m-%d")
 
     try:
+        validate_workout_doc_for_event(workout_doc)
         event_data = _prepare_event_data(
             name, workout_type, start_date, workout_doc, moving_time, distance
         )

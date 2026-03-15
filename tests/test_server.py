@@ -32,6 +32,7 @@ from intervals_mcp_server.server import (  # pylint: disable=wrong-import-positi
     get_activity_streams,
     add_or_update_event,
 )
+from intervals_mcp_server.utils.types import Step, Value, ValueUnits, WorkoutDoc
 from tests.sample_data import INTERVALS_DATA  # pylint: disable=wrong-import-position
 
 
@@ -254,3 +255,145 @@ def test_add_or_update_event(monkeypatch):
     assert "Successfully created event:" in result
     assert '"id": "e123"' in result
     assert '"name": "Test Workout"' in result
+
+
+def test_add_or_update_event_rejects_workout_doc_without_steps(monkeypatch):
+    """Test validation fails when workout_doc is provided without any steps."""
+
+    async def fake_post_request(*_args, **_kwargs):
+        raise AssertionError("API should not be called for invalid workout_doc")
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_post_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_post_request
+    )
+
+    result = asyncio.run(
+        add_or_update_event(
+            athlete_id="i1",
+            start_date="2024-01-15",
+            name="Invalid Workout",
+            workout_type="Ride",
+            workout_doc=WorkoutDoc(description="Missing steps"),
+        )
+    )
+
+    assert result == "Error: workout_doc.steps must contain at least one step."
+
+
+def test_add_or_update_event_rejects_target_without_units(monkeypatch):
+    """Test validation fails when a step intensity target is missing units."""
+
+    async def fake_post_request(*_args, **_kwargs):
+        raise AssertionError("API should not be called for invalid workout_doc")
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_post_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_post_request
+    )
+
+    result = asyncio.run(
+        add_or_update_event(
+            athlete_id="i1",
+            start_date="2024-01-15",
+            name="Invalid Workout",
+            workout_type="Ride",
+            workout_doc=WorkoutDoc(
+                description="Broken target",
+                steps=[Step(duration=300, power=Value(value=90))],
+            ),
+        )
+    )
+
+    assert result == "Error: workout_doc.steps[0].power.units is required."
+
+
+def test_add_or_update_event_rejects_nested_reps(monkeypatch):
+    """Test validation fails when a repeat block contains another repeat block."""
+
+    async def fake_post_request(*_args, **_kwargs):
+        raise AssertionError("API should not be called for invalid workout_doc")
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_post_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_post_request
+    )
+
+    result = asyncio.run(
+        add_or_update_event(
+            athlete_id="i1",
+            start_date="2024-01-15",
+            name="Invalid Workout",
+            workout_type="Ride",
+            workout_doc=WorkoutDoc(
+                description="Nested reps",
+                steps=[
+                    Step(
+                        reps=2,
+                        steps=[
+                            Step(
+                                reps=2,
+                                steps=[
+                                    Step(
+                                        duration=120,
+                                        power=Value(value=100, units=ValueUnits.PERCENT_FTP),
+                                    )
+                                ],
+                            )
+                        ],
+                    )
+                ],
+            ),
+        )
+    )
+
+    assert result == "Error: workout_doc.steps[0].steps[0].reps is not supported in nested steps."
+
+
+def test_add_or_update_event_accepts_valid_workout_doc(monkeypatch):
+    """Test a valid workout_doc passes validation and is posted to API."""
+    expected_response = {
+        "id": "e124",
+        "start_date_local": "2024-01-15T00:00:00",
+        "category": "WORKOUT",
+        "name": "Structured Workout",
+        "type": "Ride",
+    }
+    captured_payload: dict[str, object] = {}
+
+    async def fake_post_request(*_args, **kwargs):
+        captured_payload.update(kwargs.get("data", {}))
+        return expected_response
+
+    monkeypatch.setattr("intervals_mcp_server.api.client.make_intervals_request", fake_post_request)
+    monkeypatch.setattr(
+        "intervals_mcp_server.tools.events.make_intervals_request", fake_post_request
+    )
+
+    result = asyncio.run(
+        add_or_update_event(
+            athlete_id="i1",
+            start_date="2024-01-15",
+            name="Structured Workout",
+            workout_type="Ride",
+            workout_doc=WorkoutDoc(
+                description="VO2 set",
+                steps=[
+                    Step(
+                        duration=180,
+                        power=Value(value=110.0, units=ValueUnits.PERCENT_FTP),
+                        text="Hard",
+                    ),
+                    Step(
+                        duration=180,
+                        power=Value(value=60.0, units=ValueUnits.PERCENT_FTP),
+                        text="Easy",
+                    ),
+                ],
+            ),
+        )
+    )
+
+    assert "Successfully created event:" in result
+    assert isinstance(captured_payload.get("description"), str)
+    assert "VO2 set" in str(captured_payload.get("description"))
